@@ -14,20 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+set -o errexit
+set -o nounset
+set -o pipefail
 
-set -e
+if [[ -z "$(command -v flake8)" ]]; then
+  >&2 echo "Missing flake8. Install it via 'pip' to enable linting."
+  exit 1
+fi
 
-HOOKS_DIR="$(dirname "$(test -L "$0" && echo "$(dirname $0)/$(readlink "$0")" || echo "$0")")"
-
-modified_files=($(git diff --cached --name-only --diff-filter ACM))
-
-out_file="${1:-/dev/stdout}"
-
-# The checker script has a nonzero exit code on errors and reports
-# problems on STDOUT, with informational messages on STDERR. Append
-# errors to the commit message, and return success so that we don't
-# block the message.
-
-PREPARE_COMMIT_HOOK="true" \
-"${HOOKS_DIR}/check" "${modified_files[@]}" |
-sed 's/^/# /' >>"$out_file" || true
+flake8 "$@" 2>&1

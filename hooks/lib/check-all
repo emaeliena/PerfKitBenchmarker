@@ -1,0 +1,62 @@
+#!/bin/bash
+
+# Copyright 2015 Google Inc. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+set -e
+
+HOOKS_DIR="$(dirname "$(test -L "$0" && echo "$(dirname $0)/$(readlink "$0")" || echo "$0")")"
+
+# The ($()) construct as used here assumes that filenames don't contain
+# whitespace. Working around this would be possible via IFS=$'\n', but
+# doesn't seem worth the extra complications.
+modified_files=($(git ls-files))
+
+status=0
+
+if ! "${HOOKS_DIR}/check-unittest.sh"; then
+  echo >&2 "*** ERROR: *** Unit test failure."
+  status=1
+fi
+
+files_need_boilerplate=($("${HOOKS_DIR}/check-boilerplate.sh" "${modified_files[@]}"))
+
+files_with_lint_errors=($("${HOOKS_DIR}/check-lint.sh" "${modified_files[@]}"))
+
+if [[ "${#files_need_boilerplate[@]}" -ne 0 ]]; then
+  (
+    echo
+    echo "*** ERROR: *** Some files are missing the required boilerplate"
+    echo "header from hooks/boilerplate.txt:"
+    for file in "${files_need_boilerplate[@]}"; do
+      echo "  ${file}"
+    done
+    echo "See hooks/boilerplate.*.txt for required headers."
+  ) >&2
+  status=1
+fi
+
+if [[ "${#files_with_lint_errors[@]}" -ne 0 ]]; then
+  (
+    echo
+    echo "*** ERROR: *** Some files have lint errors:"
+    for file in "${files_with_lint_errors[@]}"; do
+      echo "  ${file}"
+    done
+  ) >&2
+  status=1
+fi
+
+exit $status

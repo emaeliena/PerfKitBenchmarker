@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2015 Google Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,15 +19,6 @@ set -e
 
 HOOKS_DIR="$(dirname "$(test -L "$0" && echo "$(dirname $0)/$(readlink "$0")" || echo "$0")")"
 
-modified_files=($(git diff --cached --name-only --diff-filter ACM))
+all_files=($(git ls-files))
 
-out_file="${1:-/dev/stdout}"
-
-# The checker script has a nonzero exit code on errors and reports
-# problems on STDOUT, with informational messages on STDERR. Append
-# errors to the commit message, and return success so that we don't
-# block the message.
-
-PREPARE_COMMIT_HOOK="true" \
-"${HOOKS_DIR}/check" "${modified_files[@]}" |
-sed 's/^/# /' >>"$out_file" || true
+"${HOOKS_DIR}/check" "${all_files[@]}"

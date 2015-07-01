@@ -10,6 +10,39 @@ Install them by running:
 
 from the root of the repository. This will symlink the hooks into `.git/hooks/`.
 
+The pre-push hook is currently opt-in. To enable it, set the `PKB_ORIGIN`
+environment variable to the name of a base branch, for example
+`PKB_ORIGIN=upstream/dev` for a fork, or `PKB_ORIGIN=origin/dev` when
+working on the main repository.
+
+You can also run checks manually:
+
+```bash
+# Run all checks on all files under version control.
+hooks/check-everything
+
+# Run all checks on a specific set of files.
+hooks/check FILE ...
+```
+
 [1]: http://git-scm.com/docs/githooks
 [2]: http://github.com/GoogleCloudPlatform/kubernetes
 [3]: https://pypi.python.org/pypi/flake8
+
+
+# Implementation notes
+
+The hook implementation is split into three layers:
+
+- Toplevel hook scripts determine which files need to be checked, run the
+  checker, and report back errors. They use a nonzero return code when
+  actions should be blocked (commit-msg or pre-push), and do other actions
+  where needed. (prepare-commit-msg modifies the message.)
+
+- The toplevel "check" script gets a list of files to check as arguments. It
+  prints diagnostics on STDERR, a formatted report on STDOUT (including
+  offending filenames), and has a nonzero return code if checks failed.
+
+- lib/check-* scripts take a list of files to check as arguments, and print
+  a list of offending files on STDOUT in case of problems. Exit code is zero
+  even if checks fail, nonzero exit code means it had problems running.

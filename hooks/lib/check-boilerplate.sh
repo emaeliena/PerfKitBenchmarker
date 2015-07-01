@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2015 Google Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,15 +14,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set -o errexit
-set -o nounset
-set -o pipefail
+set -euo pipefail
 
-readonly FILE=$1
+HOOKS_DIR="$(dirname "$(test -L "$0" && echo "$(dirname $0)/$(readlink "$0")" || echo "$0")")"
 
-if [[ -z "$(command -v flake8)" ]]; then
-  >&2 echo "Missing flake8. Install it via 'pip' to enable linting."
-  exit 1
-fi
+for file in "$@"; do
+  # Check for files without the required boilerplate.
+  boilerplate=$("${HOOKS_DIR}/boilerplate.sh" "${file}")
+  if [[ "$boilerplate" -eq "0" ]]; then
+    echo "$file"
+  fi
+done
 
-flake8 $1 2>&1
+exit 0
