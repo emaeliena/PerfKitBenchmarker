@@ -33,13 +33,14 @@ flags.DEFINE_boolean('openstack_boot_from_volume', False,
 
 flags.DEFINE_integer('openstack_volume_size', 20,
                      'Size of the volume (GB)')
-
+                     
+flags.DEFINE_string('openstack_zone', 'nova',
+                    'Default zone to use when booting instances')
 
 class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Object representing an OpenStack Virtual Machine"""
 
     DEFAULT_MACHINE_TYPE = 'm1.small'
-    DEFAULT_ZONE = 'nova'
     DEFAULT_USERNAME = 'ubuntu'
     # Subclasses should override the default image.
     DEFAULT_IMAGE = None
@@ -61,7 +62,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
       if vm_spec.machine_type is None:
         vm_spec.machine_type = cls.DEFAULT_MACHINE_TYPE
       if vm_spec.zone is None:
-        vm_spec.zone = cls.DEFAULT_ZONE
+        vm_spec.zone = FLAGS.openstack_zone
       if vm_spec.image is None:
         vm_spec.image = cls.DEFAULT_IMAGE
 
@@ -90,7 +91,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
             key_name=self.key_name,
             security_groups=['perfkit_sc_group'],
             nics=nics,
-            availability_zone='nova',
+            availability_zone=self.zone,
             block_device_mapping_v2=boot_from_vol,
             config_drive=FLAGS.openstack_config_drive)
         self.id = vm.id
