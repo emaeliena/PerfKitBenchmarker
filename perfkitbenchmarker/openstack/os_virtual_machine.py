@@ -14,6 +14,7 @@
 
 import logging
 import time
+import threading
 
 from perfkitbenchmarker import virtual_machine, linux_virtual_machine
 from perfkitbenchmarker import flags
@@ -44,6 +45,8 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     DEFAULT_USERNAME = 'ubuntu'
     # Subclasses should override the default image.
     DEFAULT_IMAGE = None
+    
+    _floating_ip_lock = threading.Lock()
 
     def __init__(self, vm_spec):
         super(OpenStackVirtualMachine, self).__init__(vm_spec)
@@ -100,13 +103,27 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     def _PostCreate(self):
         status = 'BUILD'
         instance = None
+        sleep = 1
         while status == 'BUILD':
             time.sleep(5)
             instance = self.client.servers.get(self.id)
             status = instance.status
-        self.floating_ip = self.client.floating_ips.create(
-            pool=FLAGS.openstack_public_network)
-        instance.add_floating_ip(self.floating_ip)
+        
+        with self._floating_ip_lock:
+            floating_ips = self.client.floating_ips.findall(instance_id=None,pool=FLAGS.openstack_public_network)
+            if floating_ips:
+                self.floating_ip = floating_ips[0]
+            else:    
+                self.floating_ip = self.client.floating_ips.create(
+                    pool=FLAGS.openstack_public_network)
+                    
+            instance.add_floating_ip(self.floating_ip) 
+            is_attached = False
+            while not is_attached:
+                is_attached = self.client.floating_ips.get(self.floating_ip.id).instance_id != None
+                if not is_attached:
+                    time.sleep(sleep)
+            
         self.ip_address = self.floating_ip.ip
         self.internal_ip = instance.networks[
             FLAGS.openstack_private_network][0]
