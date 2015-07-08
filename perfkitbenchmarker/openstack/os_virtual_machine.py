@@ -16,7 +16,7 @@ import logging
 import time
 import threading
 
-from perfkitbenchmarker import virtual_machine, linux_virtual_machine
+from perfkitbenchmarker import virtual_machine, linux_virtual_machine, disk
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.openstack import os_disk
@@ -58,6 +58,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
         self.pk = None
         self.user_name = self.DEFAULT_USERNAME
         self.boot_wait_time = None
+        self.boot_volume = None
 
     @classmethod
     def SetVmSpecDefaults(cls, vm_spec):
@@ -70,22 +71,24 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
         vm_spec.image = cls.DEFAULT_IMAGE
 
     def _Create(self):
-        image = self.client.images.findall(name=self.image)[0]
         flavor = self.client.flavors.findall(name=self.machine_type)[0]
 
         network = self.client.networks.find(
             label=FLAGS.openstack_private_network)
         nics = [{'net-id': network.id}]
-        image_id = image.id
+        image_id = None
         boot_from_vol = []
+        
         if FLAGS.openstack_boot_from_volume:
-            image_id = None
             boot_from_vol = [{'boot_index': 0,
-                              'uuid': image.id,
-                              'volume_size': FLAGS.openstack_volume_size,
-                              'source_type': 'image',
+                              'uuid': self.boot_volume._disk.id,
+                              'volume_size': self.boot_volume.disk_size,
+                              'source_type': 'volume',
                               'destination_type': 'volume',
                               'delete_on_termination': True}]
+        else:
+            image = self.client.images.findall(name=self.image)[0]
+            image_id = image.id
 
         vm = self.client.servers.create(
             name=self.name,
@@ -174,9 +177,20 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     def _CreateDependencies(self):
         self.ImportKeyfile()
+        
+        if FLAGS.openstack_boot_from_volume:
+            image = self.client.images.findall(name=self.image)[0]
+            disk_spec = disk.BaseDiskSpec(FLAGS.openstack_volume_size, disk.STANDARD, None)
+            self.boot_volume = os_disk.OpenStackDisk(disk_spec,
+                                             self.name +'-boot-volume',
+                                             self.zone, self.project,image.id)
+            self.boot_volume.Create()
 
     def _DeleteDependencies(self):
         self.DeleteKeyfile()
+        
+        if self.boot_volume:
+            self.boot_volume.Delete()
 
     def ImportKeyfile(self):
         if not (self.client.keypairs.findall(name=self.key_name)):
