@@ -104,14 +104,14 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     @vm_util.Retry(max_retries=4, poll_interval=2)
     def _PostCreate(self):
-        status = 'BUILD'
         instance = None
         sleep = 1
-        while status == 'BUILD':
-            time.sleep(5)
+        while True:
             instance = self.client.servers.get(self.id)
-            status = instance.status
-        
+            if instance.addresses:
+                break
+            time.sleep(5)
+
         with self._floating_ip_lock:
             floating_ips = self.client.floating_ips.findall(fixed_ip=None,pool=FLAGS.openstack_public_network)
             if floating_ips:
