@@ -347,6 +347,7 @@ class BenchmarkSpec(object):
     vm.DeleteScratchDisks()
 
   def PickleSpec(self):
+    return
     """Pickles the spec so that it can be unpickled on a subsequent run."""
     with open(self.file_name, 'wb') as pickle_file:
       pickle.dump(self, pickle_file, 2)

@@ -129,12 +129,12 @@ def ConfigureLogging(stderr_log_level, log_path, run_uri,
       file.
   """
   # Build the format strings for the stderr and log file message formatters.
-  stderr_format = ('%(asctime)s {} %(threadName)s %(pkb_label)s'
+  stderr_format = ('%(asctime)s {} %(threadName)s '
                    '%(levelname)-8s %(message)s').format(run_uri)
   stderr_color_format = ('%(log_color)s%(asctime)s {} %(threadName)s '
-                         '%(pkb_label)s%(levelname)-8s%(reset)s '
+                         '%(levelname)-8s%(reset)s '
                          '%(message)s').format(run_uri)
-  file_format = ('%(asctime)s {} %(threadName)s %(pkb_label)s'
+  file_format = ('%(asctime)s {} %(threadName)s '
                  '%(filename)s:%(lineno)d %(levelname)-8s %(message)s')
   file_format = file_format.format(run_uri)
 
