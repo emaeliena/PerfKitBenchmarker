@@ -19,6 +19,7 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.vm_util import POLL_INTERVAL
 
+from novaclient.exceptions import NotFound, BadRequest
 
 FLAGS = flags.FLAGS
 
