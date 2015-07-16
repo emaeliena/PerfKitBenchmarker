@@ -173,3 +173,53 @@ def retry_authorization(max_retries=1, poll_interval=POLL_INTERVAL):
         return decor
 
     return decored
+
+
+class _Pickler(object):
+    def __init__(self, nova_client, **kwargs):
+        super(_Pickler,self).__init__()
+
+        self._client = None
+        self._fields = {}
+        self.register(nova_client, **kwargs)
+
+    def register(self,nova_client=None,**kwargs):
+        if self._client and nova_client:
+            raise Exception
+        self._client = nova_client or self._client
+        self._fields.update(kwargs)
+
+    def post_get(self, dictionary):
+        if not self._client:
+            raise Exception
+
+        result = dictionary.copy()
+        del result[self._client]
+
+        for k in self._fields:
+            if k not in result or not result[k]:
+                continue
+            result['__'+k+'_id'] = result[k].id
+            del result[k]
+
+        return result
+
+    def pre_set(self,dictionary):
+        if not self._client:
+            raise Exception
+
+        client = NovaClient()
+        d = dictionary.copy()
+        d[self._client] = client
+
+        for k,v in self._fields.items():
+            field = '__'+k+'_id'
+            if field not in d:
+                continue
+            manager = getattr(client,v)
+            getter = getattr(manager,'get')
+            obj = getter(d[field])
+            d[k] = obj
+            del d[field]
+
+        return d

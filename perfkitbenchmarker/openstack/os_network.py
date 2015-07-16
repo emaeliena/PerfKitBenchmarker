@@ -36,6 +36,7 @@ class OpenStackFirewall(network.BaseFirewall):
         super(OpenStackFirewall, self).__init__(project)
         self.project = project
         self.__nclient = utils.NovaClient()
+        self.pickler = utils._Pickler('_OpenStackFirewall__nclient',sec_group='security_groups')
 
         if not (self.__nclient.security_groups.findall(
                 name='perfkit_sc_group')):
@@ -49,6 +50,14 @@ class OpenStackFirewall(network.BaseFirewall):
 
         self.AllowPort(None, -1, protocol='icmp')
         self.AllowPort(None, 1, MAX_PORT)
+
+    def __getstate__(self):
+        state = self.__dict__
+        return self.pickler.post_get(state)
+
+    def __setstate__(self,dictionary):
+        state = pickler.pre_set(dictionary)
+        self.__dict__ = state
 
     def AllowPort(self, vm, from_port, to_port=None, protocol='tcp'):
         if to_port is None:

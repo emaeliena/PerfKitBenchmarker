@@ -34,7 +34,7 @@ flags.DEFINE_boolean('openstack_boot_from_volume', False,
 
 flags.DEFINE_integer('openstack_volume_size', 20,
                      'Size of the volume (GB)')
-                     
+
 flags.DEFINE_string('openstack_zone', 'nova',
                     'Default zone to use when booting instances')
 
@@ -45,7 +45,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     DEFAULT_USERNAME = 'ubuntu'
     # Subclasses should override the default image.
     DEFAULT_IMAGE = None
-    
+
     _floating_ip_lock = threading.Lock()
 
     def __init__(self, vm_spec):
@@ -59,6 +59,16 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
         self.user_name = self.DEFAULT_USERNAME
         self.boot_wait_time = None
         self.boot_volume = None
+        self.pickler = os_utils._Pickler('client',pk='keypairs',floating_ip='floating_ips')
+
+
+    def __getstate__(self):
+        state = super(OpenStackVirtualMachine,self).__getstate__()
+        return self.pickler.post_get(state)
+
+    def __setstate__(self,dictionary):
+        state = pickler.pre_set(dictionary)
+        super(OpenStackVirtualMachine,self).__setstate__(state)
 
     @classmethod
     def SetVmSpecDefaults(cls, vm_spec):
@@ -78,7 +88,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
         nics = [{'net-id': network.id}]
         image_id = None
         boot_from_vol = []
-        
+
         if FLAGS.openstack_boot_from_volume:
             boot_from_vol = [{'boot_index': 0,
                               'uuid': self.boot_volume._disk.id,
@@ -116,17 +126,17 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
             floating_ips = self.client.floating_ips.findall(fixed_ip=None,pool=FLAGS.openstack_public_network)
             if floating_ips:
                 self.floating_ip = floating_ips[0]
-            else:    
+            else:
                 self.floating_ip = self.client.floating_ips.create(
                     pool=FLAGS.openstack_public_network)
-                    
-            instance.add_floating_ip(self.floating_ip) 
+
+            instance.add_floating_ip(self.floating_ip)
             is_attached = False
             while not is_attached:
                 is_attached = self.client.floating_ips.get(self.floating_ip.id).fixed_ip != None
                 if not is_attached:
                     time.sleep(sleep)
-            
+
         self.ip_address = self.floating_ip.ip
         self.internal_ip = instance.networks[
             FLAGS.openstack_private_network][0]
@@ -177,7 +187,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     def _CreateDependencies(self):
         self.ImportKeyfile()
-        
+
         if FLAGS.openstack_boot_from_volume:
             image = self.client.images.findall(name=self.image)[0]
             disk_spec = disk.BaseDiskSpec(FLAGS.openstack_volume_size, disk.STANDARD, None)
@@ -188,7 +198,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     def _DeleteDependencies(self):
         self.DeleteKeyfile()
-        
+
         if self.boot_volume:
             self.boot_volume.Delete()
 
