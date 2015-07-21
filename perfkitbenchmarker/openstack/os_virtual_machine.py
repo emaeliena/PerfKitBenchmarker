@@ -145,10 +145,18 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     def _Delete(self):
         try:
             self.client.servers.delete(self.id)
-            time.sleep(5)
-            self.client.floating_ips.delete(self.floating_ip)
         except os_utils.NotFound:
             logging.info('Instance already deleted')
+
+        while self.client.servers.findall(name=self.name):
+            time.sleep(5)
+
+        if not self.client.floating_ips.get(self.floating_ip.id).fixed_ip:
+            with self._floating_ip_lock:
+                if not self.client.floating_ips.get(self.floating_ip.id).fixed_ip:
+                    self.client.floating_ips.delete(self.floating_ip)
+                    while self.client.floating_ips.findall(id=self.floating_ip.id):
+                        time.sleep(1)
 
     @os_utils.retry_authorization(max_retries=4)
     def _Exists(self):
