@@ -35,7 +35,7 @@ class OpenStackDisk(disk.BaseDisk):
         self.attached_vm_id = -1
         self.image = image
         self.name = name
-        self.zone = zone
+        self.zone = 'nova'
         self.project = project
         self.device = ""
         self.virtual_disk_idx = 1
