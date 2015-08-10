@@ -110,6 +110,8 @@ def Configure(vm, seed_vms):
       'log4j.appender.R.File={0}/logs/system.log," {1}'.format(
           CASSANDRA_DIR,
           posixpath.join(CASSANDRA_DIR, 'conf', 'log4j-server.properties')))
+  vm.RemoteCommand('sed -i "257d" /tmp/pkb/apache-cassandra/conf/cassandra-env.sh')
+  vm.RemoteCommand('echo "127.0.0.1 `hostname`" | sudo tee -a /etc/hosts')
 
 
 def Start(vm):
