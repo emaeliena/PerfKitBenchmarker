@@ -215,6 +215,7 @@ class _Pickler(object):
         for k,v in self._fields.items():
             field = '__'+k+'_id'
             if field not in d:
+                d[k] = None
                 continue
             manager = getattr(client,v)
             getter = getattr(manager,'get')

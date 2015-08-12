@@ -59,6 +59,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
         self.user_name = self.DEFAULT_USERNAME
         self.boot_wait_time = None
         self.boot_volume = None
+        self.floating_ip = None
         self.pickler = os_utils._Pickler('client',pk='keypairs',floating_ip='floating_ips')
 
 
@@ -151,7 +152,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
         while self.client.servers.findall(name=self.name):
             time.sleep(5)
 
-        if not self.client.floating_ips.get(self.floating_ip.id).fixed_ip:
+        if self.floating_ip and not self.client.floating_ips.get(self.floating_ip.id).fixed_ip:
             with self._floating_ip_lock:
                 if not self.client.floating_ips.get(self.floating_ip.id).fixed_ip:
                     self.client.floating_ips.delete(self.floating_ip)
