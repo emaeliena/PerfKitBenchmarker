@@ -35,13 +35,14 @@ flags.DEFINE_boolean('openstack_boot_from_volume', False,
 flags.DEFINE_integer('openstack_volume_size', 20,
                      'Size of the volume (GB)')
 
-flags.DEFINE_string('openstack_zone', 'nova',
-                    'Default zone to use when booting instances')
+flags.DEFINE_string('openstack_volume_zone', 'nova',
+                    'Volume zone used for scratch disks and instance volumes')
 
 class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Object representing an OpenStack Virtual Machine"""
 
     DEFAULT_MACHINE_TYPE = 'm1.small'
+    DEFAULT_ZONE = 'nova'
     DEFAULT_USERNAME = 'ubuntu'
     # Subclasses should override the default image.
     DEFAULT_IMAGE = None
@@ -77,7 +78,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
       if vm_spec.machine_type is None:
         vm_spec.machine_type = cls.DEFAULT_MACHINE_TYPE
       if vm_spec.zone is None:
-        vm_spec.zone = FLAGS.openstack_zone
+        vm_spec.zone = cls.DEFAULT_ZONE
       if vm_spec.image is None:
         vm_spec.image = cls.DEFAULT_IMAGE
 
@@ -184,7 +185,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     def CreateScratchDisk(self, disk_spec):
         name = '%s-scratch-%s' % (self.name, len(self.scratch_disks))
-        scratch_disk = os_disk.OpenStackDisk(disk_spec, name, self.zone,
+        scratch_disk = os_disk.OpenStackDisk(disk_spec, name, FLAGS.openstack_volume_zone,
                                              self.project)
         self.scratch_disks.append(scratch_disk)
 
@@ -202,7 +203,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
             disk_spec = disk.BaseDiskSpec(FLAGS.openstack_volume_size, disk.STANDARD, None)
             self.boot_volume = os_disk.OpenStackDisk(disk_spec,
                                              self.name +'-boot-volume',
-                                             self.zone, self.project,image.id)
+                                             FLAGS.openstack_volume_zone, self.project,image.id)
             self.boot_volume.Create()
 
     def _DeleteDependencies(self):
