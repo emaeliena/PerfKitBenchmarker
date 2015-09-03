@@ -183,16 +183,22 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
             self.hostname = resp[:-1]
 
     def CreateScratchDisk(self, disk_spec):
-        name = '%s-scratch-%s' % (self.name, len(self.scratch_disks))
-        scratch_disk = os_disk.OpenStackDisk(disk_spec, name, self.zone,
-                                             self.project)
-        self.scratch_disks.append(scratch_disk)
+        #name = '%s-scratch-%s' % (self.name, len(self.scratch_disks))
+        #scratch_disk = os_disk.OpenStackDisk(disk_spec, name, self.zone,
+        #                                     self.project)
+        #self.scratch_disks.append(scratch_disk)
 
-        scratch_disk.Create()
-        scratch_disk.Attach(self)
+        #scratch_disk.Create()
+        #scratch_disk.Attach(self)
 
-        self.FormatDisk(scratch_disk.GetDevicePath())
-        self.MountDisk(scratch_disk.GetDevicePath(), disk_spec.mount_point)
+        #self.FormatDisk(scratch_disk.GetDevicePath())
+        #self.MountDisk(scratch_disk.GetDevicePath(), disk_spec.mount_point)
+        mount_point  = disk_spec.mount_point
+        tmp_dir = "/tmp/disks/%s" % mount_point.replace("/","_")
+        mkdir = "mkdir -p %s" % tmp_dir
+        self.RemoteCommand(mkdir)
+        disk_spec.mount_point=tmp_dir
+        self.scratch_disks.append(disk_spec)
 
     def _CreateDependencies(self):
         self.ImportKeyfile()
