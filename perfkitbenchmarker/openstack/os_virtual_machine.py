@@ -144,6 +144,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     @os_utils.retry_authorization(max_retries=4)
     def _Delete(self):
+        return
         try:
             self.client.servers.delete(self.id)
         except os_utils.NotFound:
@@ -212,6 +213,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
             self.boot_volume.Create()
 
     def _DeleteDependencies(self):
+        return
         self.DeleteKeyfile()
 
         if self.boot_volume:
@@ -230,6 +232,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     @os_utils.retry_authorization(max_retries=4)
     def DeleteKeyfile(self):
+        return
         try:
             self.client.keypairs.delete(self.pk)
         except os_utils.NotFound:

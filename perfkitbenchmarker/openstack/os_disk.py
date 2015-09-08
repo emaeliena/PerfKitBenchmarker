@@ -66,6 +66,7 @@ class OpenStackDisk(disk.BaseDisk):
 
     @retry_authorization(max_retries=4)
     def _Delete(self):
+        return
         sleep = 1
         sleep_count = 0
         try:
@@ -112,5 +113,6 @@ class OpenStackDisk(disk.BaseDisk):
         return self.device
 
     def Detach(self):
+        return
         self.__nclient.volumes.delete_server_volume(self.attached_vm_id,
                                                     self.attach_id)
