@@ -74,14 +74,6 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
         self.pickler = os_utils._Pickler('client',pk='keypairs',floating_ip='floating_ips')
 
 
-    def __getstate__(self):
-        state = super(OpenStackVirtualMachine,self).__getstate__()
-        return self.pickler.post_get(state)
-
-    def __setstate__(self,dictionary):
-        state = pickler.pre_set(dictionary)
-        super(OpenStackVirtualMachine,self).__setstate__(state)
-
     @classmethod
     def SetVmSpecDefaults(cls, vm_spec):
       """Updates the VM spec with cloud specific defaults."""
