@@ -16,6 +16,9 @@
 
 import logging
 import pickle
+import copy_reg
+import thread
+import threading
 
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
@@ -38,6 +41,21 @@ from perfkitbenchmarker.openstack import os_network as openstack_network
 from perfkitbenchmarker.openstack import os_virtual_machine as openstack_vm
 from perfkitbenchmarker.rackspace import rackspace_network as rax_net
 from perfkitbenchmarker.rackspace import rackspace_virtual_machine as rax_vm
+
+
+def PickleLock(lock):
+    return UnPickleLock, (lock.locked(),)
+
+
+def UnPickleLock(locked, *args):
+    lock = threading.Lock()
+    if locked:
+        if not lock.acquire(False):
+            raise pickle.UnpicklingError("Cannot acquire lock")
+    return lock
+
+
+copy_reg.pickle(thread.LockType, PickleLock)
 
 GCP = 'GCP'
 AZURE = 'Azure'
@@ -348,6 +366,7 @@ class BenchmarkSpec(object):
 
   def PickleSpec(self):
     """Pickles the spec so that it can be unpickled on a subsequent run."""
+    self.networks = network.BaseNetwork.networks
     with open(self.file_name, 'wb') as pickle_file:
       pickle.dump(self, pickle_file, 2)
 
@@ -368,6 +387,7 @@ class BenchmarkSpec(object):
     except Exception as e:  # pylint: disable=broad-except
       logging.error('Unable to unpickle spec file for benchmark %s.', name)
       raise e
+    network.BaseNetwork.networks = spec.networks
     # Always let the spec be deleted after being unpickled so that
     # it's possible to run cleanup even if cleanup has already run.
     spec.deleted = False

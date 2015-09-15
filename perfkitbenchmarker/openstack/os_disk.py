@@ -19,7 +19,6 @@ import string
 from perfkitbenchmarker.openstack import utils as os_utils
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import disk
-from perfkitbenchmarker.openstack import utils
 from perfkitbenchmarker.openstack.utils import retry_authorization
 
 
@@ -30,7 +29,7 @@ class OpenStackDisk(disk.BaseDisk):
 
     def __init__(self, disk_spec, name, zone, project, image=None):
         super(OpenStackDisk, self).__init__(disk_spec)
-        self.__nclient = utils.NovaClient()
+        self.__nclient = os_utils.NovaClient()
         self.attached_vm_name = None
         self.attached_vm_id = -1
         self.image = image

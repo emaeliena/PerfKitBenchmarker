@@ -59,6 +59,13 @@ flags.DEFINE_enum('object_storage_scenario', 'all',
                   'api_namespace: runs API based benchmarking for namespace '
                   'operations.')
 
+flags.DEFINE_enum('cli_test_size', 'normal',
+                  ['normal', 'large'],
+                  'size of the cli tests. Normal means a mixture of various \n'
+                  'object sizes up to 32MiB (see '
+                  'data/cloud-storage-workload.sh). \n'
+                  'Large means all objects are of at least 1GiB.')
+
 flags.DEFINE_string('object_storage_credential_file', None,
                     'Directory of credential file.')
 
@@ -78,7 +85,7 @@ BENCHMARK_INFO = {'name': 'object_storage_service',
                   'num_machines': 1}
 
 AWS_CREDENTIAL_LOCATION = '.aws'
-GCE_CREDENTIAL_LOCATION = '.config/gcloud'
+GCE_CREDENTIAL_LOCATION = '.config/gcloud/credentials'
 AZURE_CREDENTIAL_LOCATION = '.azure'
 
 DEFAULT_BOTO_LOCATION = '~/.boto'
@@ -92,6 +99,8 @@ DATA_FILE = 'cloud-storage-workload.sh'
 # size of all data used in the CLI tests.
 DATA_SIZE_IN_BYTES = 256.1 * 1024 * 1024
 DATA_SIZE_IN_MBITS = 8 * DATA_SIZE_IN_BYTES / 1000 / 1000
+LARGE_DATA_SIZE_IN_BYTES = 3 * 1024 * 1024 * 1024
+LARGE_DATA_SIZE_IN_MBITS = 8 * LARGE_DATA_SIZE_IN_BYTES / 1000 / 1000
 
 API_TEST_SCRIPT = 'object_storage_api_tests.py'
 
@@ -107,7 +116,10 @@ PERCENTILES_LIST = ['p1', 'p5', 'p50', 'p90', 'p99', 'p99.9', 'average',
 
 UPLOAD_THROUGHPUT_VIA_CLI = 'upload throughput via cli Mbps'
 DOWNLOAD_THROUGHPUT_VIA_CLI = 'download throughput via cli Mbps'
+
 CLI_TEST_ITERATION_COUNT = 100
+LARGE_CLI_TEST_ITERATION_COUNT = 20
+
 CLI_TEST_FAILURE_TOLERANCE = 0.05
 # Azure does not parallelize operations in its CLI tools. We have to
 # do the uploads or downloads of 100 test files sequentially, it takes
@@ -230,7 +242,7 @@ def ApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
           one_byte_rw_cmd = ('%s %s') % (one_byte_rw_cmd, azure_command_suffix)
 
         _, raw_result = vm.RemoteCommand(one_byte_rw_cmd)
-        logging.info('OneByteRW raw result is %s' % raw_result)
+        logging.info('OneByteRW raw result is %s', raw_result)
 
         for up_and_down in ['upload', 'download']:
           search_string = 'One byte %s - (.*)' % up_and_down
@@ -260,7 +272,7 @@ def ApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
             single_stream_throughput_cmd, azure_command_suffix)
 
       _, raw_result = vm.RemoteCommand(single_stream_throughput_cmd)
-      logging.info('SingleStreamThroughput raw result is %s' % raw_result)
+      logging.info('SingleStreamThroughput raw result is %s', raw_result)
 
       for up_and_down in ['upload', 'download']:
         search_string = 'Single stream %s throughput in Bps: (.*)' % up_and_down
@@ -298,7 +310,7 @@ def ApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
 
 
       _, raw_result = vm.RemoteCommand(list_consistency_cmd)
-      logging.info('ListConsistency raw result is %s' % raw_result)
+      logging.info('ListConsistency raw result is %s', raw_result)
 
       for scenario in LIST_CONSISTENCY_SCENARIOS:
         metric_name = '%s %s' % (scenario, LIST_CONSISTENCY_PERCENTAGE)
@@ -434,6 +446,12 @@ def _CliBasedTests(output_results, metadata, vm, iteration_count,
   # CLI tool based tests.
   cli_upload_results = []
   cli_download_results = []
+  data_size_in_mbits = 0
+  if FLAGS.cli_test_size == 'normal':
+    data_size_in_mbits = DATA_SIZE_IN_MBITS
+  else:
+    data_size_in_mbits = LARGE_DATA_SIZE_IN_MBITS
+
   for _ in range(iteration_count):
     vm.RemoteCommand(clean_up_bucket_cmd, ignore_failure=True)
 
@@ -447,7 +465,7 @@ def _CliBasedTests(output_results, metadata, vm, iteration_count,
 
     if upload_successful:
       logging.debug(res)
-      throughput = DATA_SIZE_IN_MBITS / vm_util.ParseTimeCommandResult(res)
+      throughput = data_size_in_mbits / vm_util.ParseTimeCommandResult(res)
 
       # Output some log traces to show we are making progress
       logging.info('cli upload throughput %f', throughput)
@@ -464,7 +482,7 @@ def _CliBasedTests(output_results, metadata, vm, iteration_count,
 
       if download_successful:
         logging.debug(res)
-        throughput = DATA_SIZE_IN_MBITS / vm_util.ParseTimeCommandResult(res)
+        throughput = data_size_in_mbits / vm_util.ParseTimeCommandResult(res)
 
         logging.info('cli download throughput %f', throughput)
         cli_download_results.append(throughput)
@@ -477,14 +495,20 @@ def _CliBasedTests(output_results, metadata, vm, iteration_count,
                                 'iterations.')
 
   # Report various percentiles.
+  metrics_prefix = ''
+  if FLAGS.cli_test_size != 'normal':
+    metrics_prefix = '%s ' % FLAGS.cli_test_size
+
   _AppendPercentilesToResults(output_results,
                               cli_upload_results,
-                              UPLOAD_THROUGHPUT_VIA_CLI,
+                              '%s%s' % (metrics_prefix,
+                                        UPLOAD_THROUGHPUT_VIA_CLI),
                               THROUGHPUT_UNIT,
                               metadata)
   _AppendPercentilesToResults(output_results,
                               cli_download_results,
-                              DOWNLOAD_THROUGHPUT_VIA_CLI,
+                              '%s%s' % (metrics_prefix,
+                                        DOWNLOAD_THROUGHPUT_VIA_CLI),
                               THROUGHPUT_UNIT,
                               metadata)
 
@@ -537,7 +561,12 @@ class S3StorageBenchmark(object):
     download_cmd = 'time aws s3 sync s3://%s/ %s/run/temp/' % (
                    self.bucket_name, scratch_dir)
 
-    _CliBasedTests(results, metadata, vm, CLI_TEST_ITERATION_COUNT,
+    if FLAGS.cli_test_size == 'normal':
+      iteration_count = CLI_TEST_ITERATION_COUNT
+    else:
+      iteration_count = LARGE_CLI_TEST_ITERATION_COUNT
+
+    _CliBasedTests(results, metadata, vm, iteration_count,
                    clean_up_bucket_cmd, upload_cmd, cleanup_local_temp_cmd,
                    download_cmd)
 
@@ -630,23 +659,42 @@ class AzureBlobStorageBenchmark(object):
                            _MakeAzureCommandSuffix(vm.azure_account,
                                                    vm.azure_key,
                                                    False)))
-
-    upload_cmd = ('time for i in {0..99}; do azure storage blob upload '
-                  '%s/run/data/file-$i.dat %s %s; done' %
-                  (scratch_dir,
-                   self.bucket_name,
-                   _MakeAzureCommandSuffix(vm.azure_account,
-                                           vm.azure_key,
-                                           True)))
+    if FLAGS.cli_test_size == 'normal':
+      upload_cmd = ('time for i in {0..99}; do azure storage blob upload '
+                    '%s/run/data/file-$i.dat %s %s; done' %
+                    (scratch_dir,
+                     self.bucket_name,
+                     _MakeAzureCommandSuffix(vm.azure_account,
+                                             vm.azure_key,
+                                             True)))
+    else:
+      upload_cmd = ('time azure storage blob upload '
+                    '%s/run/data/file_large_3gib.dat %s %s' %
+                    (scratch_dir,
+                     self.bucket_name,
+                     _MakeAzureCommandSuffix(vm.azure_account,
+                                             vm.azure_key,
+                                             True)))
 
     cleanup_local_temp_cmd = 'rm %s/run/temp/*' % scratch_dir
-    download_cmd = ('time for i in {0..99}; do azure storage blob download '
-                    '%s file-$i.dat %s/run/temp/file-$i.dat %s; done' % (
-                        self.bucket_name,
-                        scratch_dir,
-                        _MakeAzureCommandSuffix(vm.azure_account,
-                                                vm.azure_key,
-                                                True)))
+
+    if FLAGS.cli_test_size == 'normal':
+      download_cmd = ('time for i in {0..99}; do azure storage blob download '
+                      '%s file-$i.dat %s/run/temp/file-$i.dat %s; done' % (
+                          self.bucket_name,
+                          scratch_dir,
+                          _MakeAzureCommandSuffix(vm.azure_account,
+                                                  vm.azure_key,
+                                                  True)))
+    else:
+      download_cmd = ('time azure storage blob download %s '
+                      'file_large_3gib.dat '
+                      '%s/run/temp/file_large_3gib.dat %s' % (
+                          self.bucket_name,
+                          scratch_dir,
+                          _MakeAzureCommandSuffix(vm.azure_account,
+                                                  vm.azure_key,
+                                                  True)))
 
     _CliBasedTests(results, metadata, vm, CLI_TEST_ITERATION_COUNT_AZURE,
                    cleanup_bucket_cmd, upload_cmd, cleanup_local_temp_cmd,
@@ -710,7 +758,7 @@ class GoogleCloudStorageBenchmark(object):
     except errors.VirtualMachine.RemoteCommandError:
       # If ran on existing machines, .config folder may already exists.
       pass
-    vm.PushFile(FLAGS.object_storage_credential_file, '.config/')
+    vm.PushFile(FLAGS.object_storage_credential_file, '.config/gcloud')
     vm.PushFile(FLAGS.boto_file_location, DEFAULT_BOTO_LOCATION)
 
     vm.gsutil_path, _ = vm.RemoteCommand('which gsutil', login_shell=True)
@@ -724,6 +772,30 @@ class GoogleCloudStorageBenchmark(object):
     vm.RemoteCommand('%s mb -c DRA -l %s gs://%s' % (vm.gsutil_path,
                                                      DEFAULT_GCS_REGION,
                                                      self.regional_bucket_name))
+
+    # Detect if we need to install crcmod for gcp.
+    # See "gsutil help crc" for details.
+    raw_result, _ = vm.RemoteCommand('%s version -l' % vm.gsutil_path)
+    logging.info('gsutil version -l raw result is %s', raw_result)
+    search_string = 'compiled crcmod: True'
+    result_string = re.findall(search_string, raw_result)
+    if len(result_string) == 0:
+      logging.info('compiled crcmod is not available, installing now...')
+      try:
+        # Try uninstall first just in case there is a pure python version of
+        # crcmod on the system already, this is required by gsutil doc:
+        # https://cloud.google.com/storage/docs/
+        # gsutil/addlhelp/CRC32CandInstallingcrcmod
+        vm.RemoteCommand('/usr/bin/yes |sudo pip uninstall crcmod')
+      except:
+        logging.info('pip uninstall crcmod failed, could be normal if crcmod '
+                     'is not available at all.')
+        pass
+      vm.Install('crcmod')
+      vm.installed_crcmod = True
+    else:
+      logging.info('compiled crcmod is available, not installing again.')
+      vm.installed_crcmod = False
 
 
   def Run(self, vm, metadata):
@@ -744,6 +816,7 @@ class GoogleCloudStorageBenchmark(object):
       the results of all scenarios run here.
     """
     results = []
+    metadata['pkb_installed_crcmod'] = vm.installed_crcmod
     # CLI tool based tests.
     scratch_dir = vm.GetScratchDir()
     clean_up_bucket_cmd = '%s rm gs://%s/*' % (vm.gsutil_path, self.bucket_name)
@@ -754,8 +827,12 @@ class GoogleCloudStorageBenchmark(object):
     download_cmd = 'time %s -m cp gs://%s/* %s/run/temp/' % (vm.gsutil_path,
                                                              self.bucket_name,
                                                              scratch_dir)
+    if FLAGS.cli_test_size == 'normal':
+      iteration_count = CLI_TEST_ITERATION_COUNT
+    else:
+      iteration_count = LARGE_CLI_TEST_ITERATION_COUNT
 
-    _CliBasedTests(results, metadata, vm, CLI_TEST_ITERATION_COUNT,
+    _CliBasedTests(results, metadata, vm, iteration_count,
                    clean_up_bucket_cmd, upload_cmd, cleanup_local_temp_cmd,
                    download_cmd)
 
@@ -821,7 +898,7 @@ def Prepare(benchmark_spec):
 
   vms[0].Install('pip')
   vms[0].RemoteCommand('sudo pip install python-gflags==2.0')
-  vms[0].RemoteCommand('sudo pip install azure')
+  vms[0].RemoteCommand('sudo pip install azure==1.0.0')
   vms[0].Install('gcs_boto_plugin')
 
   OBJECT_STORAGE_BENCHMARK_DICTIONARY[FLAGS.storage].Prepare(vms[0])
@@ -866,7 +943,8 @@ def Run(benchmark_spec):
 
   # The client tool based tests requires some provisioning on the VMs first.
   vms[0].RemoteCommand(
-      'cd %s/run/; bash cloud-storage-workload.sh' % vms[0].GetScratchDir())
+      'cd %s/run/; bash cloud-storage-workload.sh %s' % (vms[0].GetScratchDir(),
+                                                         FLAGS.cli_test_size))
   results = OBJECT_STORAGE_BENCHMARK_DICTIONARY[FLAGS.storage].Run(vms[0],
                                                                    metadata)
   print results

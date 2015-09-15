@@ -20,9 +20,11 @@ from perfkitbenchmarker import virtual_machine, linux_virtual_machine, disk
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.openstack import os_disk
+from perfkitbenchmarker.openstack import os_network
 from perfkitbenchmarker.openstack import utils as os_utils
 
 UBUNTU_IMAGE = 'ubuntu-14.04'
+NONE = 'None'
 
 FLAGS = flags.FLAGS
 
@@ -32,11 +34,17 @@ flags.DEFINE_boolean('openstack_config_drive', False,
 flags.DEFINE_boolean('openstack_boot_from_volume', False,
                      'Boot from volume instead of an image')
 
-flags.DEFINE_integer('openstack_volume_size', 20,
+flags.DEFINE_integer('openstack_volume_size', None,
                      'Size of the volume (GB)')
 
 flags.DEFINE_string('openstack_zone', 'nova',
                     'Default zone to use when booting instances')
+
+flags.DEFINE_enum('openstack_scheduler_policy', NONE,
+                  [NONE, 'affinity', 'anti-affinity'],
+                  'Add possibility to use affinity or anti-affinity '
+                  'policy in scheduling process')
+
 
 class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Object representing an OpenStack Virtual Machine"""
@@ -54,6 +62,9 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
         self.key_name = 'perfkit_key_%d_%s' % (self.instance_number,
                                                FLAGS.run_uri)
         self.client = os_utils.NovaClient()
+        self.public_network = os_network.OpenStackPublicNetwork(
+            FLAGS.openstack_public_network
+        )
         self.id = None
         self.pk = None
         self.user_name = self.DEFAULT_USERNAME
@@ -89,12 +100,30 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
         nics = [{'net-id': network.id}]
         image_id = None
         boot_from_vol = []
+        scheduler_hints = None
+
+        if FLAGS.openstack_scheduler_policy != NONE:
+            group_name = 'perfkit_%s' % FLAGS.run_uri
+            try:
+                group = self.client.server_groups.findall(name=group_name)[0]
+            except IndexError:
+                group = self.client.server_groups.create(
+                    policies=[FLAGS.openstack_scheduler_policy],
+                    name=group_name)
+            scheduler_hints = {'group': group.id}
 
         if FLAGS.openstack_boot_from_volume:
+
+            if FLAGS.openstack_volume_size:
+                volume_size = FLAGS.openstack_volume_size
+            else:
+                volume_size = flavor.disk
+
+            image_id = None
             boot_from_vol = [{'boot_index': 0,
-                              'uuid': self.boot_volume._disk.id,
-                              'volume_size': self.boot_volume.disk_size,
-                              'source_type': 'volume',
+                              'uuid': image.id,
+                              'volume_size': volume_size,
+                              'source_type': 'image',
                               'destination_type': 'volume',
                               'delete_on_termination': True}]
         else:
@@ -110,6 +139,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
             nics=nics,
             availability_zone=self.zone,
             block_device_mapping_v2=boot_from_vol,
+            scheduler_hints=scheduler_hints,
             config_drive=FLAGS.openstack_config_drive)
         self.id = vm.id
 
@@ -119,24 +149,13 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
         sleep = 1
         while True:
             instance = self.client.servers.get(self.id)
-            if instance.addresses:
-                break
-            time.sleep(5)
+            status = instance.status
 
-        with self._floating_ip_lock:
-            floating_ips = self.client.floating_ips.findall(fixed_ip=None,pool=FLAGS.openstack_public_network)
-            if floating_ips:
-                self.floating_ip = floating_ips[0]
-            else:
-                self.floating_ip = self.client.floating_ips.create(
-                    pool=FLAGS.openstack_public_network)
+        self.floating_ip = self.public_network.get_or_create()
+        instance.add_floating_ip(self.floating_ip)
 
-            instance.add_floating_ip(self.floating_ip)
-            is_attached = False
-            while not is_attached:
-                is_attached = self.client.floating_ips.get(self.floating_ip.id).fixed_ip != None
-                if not is_attached:
-                    time.sleep(sleep)
+        while not self.public_network.is_attached(self.floating_ip):
+            time.sleep(1)
 
         self.ip_address = self.floating_ip.ip
         self.internal_ip = instance.networks[
@@ -146,18 +165,11 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     def _Delete(self):
         try:
             self.client.servers.delete(self.id)
+            time.sleep(5)
         except os_utils.NotFound:
             logging.info('Instance already deleted')
 
-        while self.client.servers.findall(name=self.name):
-            time.sleep(5)
-
-        if self.floating_ip and not self.client.floating_ips.get(self.floating_ip.id).fixed_ip:
-            with self._floating_ip_lock:
-                if not self.client.floating_ips.get(self.floating_ip.id).fixed_ip:
-                    self.client.floating_ips.delete(self.floating_ip)
-                    while self.client.floating_ips.findall(id=self.floating_ip.id):
-                        time.sleep(1)
+        self.public_network.release(self.floating_ip)
 
     @os_utils.retry_authorization(max_retries=4)
     def _Exists(self):

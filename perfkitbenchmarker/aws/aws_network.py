@@ -1,4 +1,4 @@
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2015 Google Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -40,17 +40,6 @@ class AwsFirewall(network.BaseFirewall):
 
   def __init__(self, project):
     self.firewall_set = set()
-    self._lock = threading.Lock()
-
-  def __getstate__(self):
-    """Implements getstate to allow pickling (since locks can't be pickled)."""
-    d = self.__dict__.copy()
-    del d['_lock']
-    return d
-
-  def __setstate__(self, state):
-    """Restores the lock after the object is unpickled."""
-    self.__dict__ = state
     self._lock = threading.Lock()
 
   def AllowPort(self, vm, port):
@@ -151,21 +140,23 @@ class AwsVpc(resource.BaseResource):
 class AwsSubnet(resource.BaseResource):
   """An object representing an Aws subnet."""
 
-  def __init__(self, zone, vpc_id):
+  def __init__(self, zone, vpc_id, cidr_block='10.0.0.0/24'):
     super(AwsSubnet, self).__init__()
     self.zone = zone
     self.region = zone[:-1]
     self.vpc_id = vpc_id
     self.id = None
+    self.cidr_block = cidr_block
 
   def _Create(self):
     """Creates the subnet."""
+
     create_cmd = util.AWS_PREFIX + [
         'ec2',
         'create-subnet',
         '--region=%s' % self.region,
         '--vpc-id=%s' % self.vpc_id,
-        '--cidr-block=10.0.0.0/24',
+        '--cidr-block=%s' % self.cidr_block,
         '--availability-zone=%s' % self.zone]
     stdout, _, _ = vm_util.IssueCommand(create_cmd)
     response = json.loads(stdout)

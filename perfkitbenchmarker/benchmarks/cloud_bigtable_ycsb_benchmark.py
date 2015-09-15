@@ -31,6 +31,7 @@ The benchmark will fail if the specified cluster is not found.
 import json
 import logging
 import os
+import pipes
 import posixpath
 import subprocess
 
@@ -55,12 +56,13 @@ flags.DEFINE_string('google_bigtable_cluster_name', None,
 flags.DEFINE_string(
     'google_bigtable_alpn_jar_url',
     'http://central.maven.org/maven2/org/mortbay/jetty/alpn/'
-    'alpn-boot/7.0.0.v20140317/alpn-boot-7.0.0.v20140317.jar',
+    'alpn-boot/7.1.3.v20150130/alpn-boot-7.1.3.v20150130.jar',
     'URL for the ALPN boot JAR, required for HTTP2')
 flags.DEFINE_string(
     'google_bigtable_hbase_jar_url',
-    'https://storage.googleapis.com/cloud-bigtable/jars/'
-    'bigtable-hbase/bigtable-hbase-0.1.5.jar',
+    'https://oss.sonatype.org/service/local/repositories/releases/content/'
+    'com/google/cloud/bigtable/bigtable-hbase-1.0/'
+    '0.2.1/bigtable-hbase-1.0-0.2.1.jar',
     'URL for the Bigtable-HBase client JAR.')
 
 
@@ -137,9 +139,11 @@ def _GetClusterDescription(project, zone, cluster_name):
   Raises:
     KeyError: when the cluster was not found.
   """
+  env = {'CLOUDSDK_CORE_DISABLE_PROMPTS': '1'}
+  env.update(os.environ)
   cmd = [FLAGS.gcloud_path, 'alpha', 'bigtable', 'clusters', 'list', '--quiet',
-         '--format', 'json']
-  stdout, stderr, returncode = vm_util.IssueCommand(cmd)
+         '--format', 'json', '--project', project]
+  stdout, stderr, returncode = vm_util.IssueCommand(cmd, env=env)
   if returncode:
     raise IOError('Command "{0}" failed:\nSTDOUT:\n{1}\nSTDERR:\n{2}'.format(
         ' '.join(cmd), stdout, stderr))
@@ -202,23 +206,12 @@ def _Install(vm):
 
   for file_name in HBASE_CONF_FILES:
     file_path = data.ResourcePath(file_name)
-    for conf_dir in [hbase.HBASE_CONF_DIR, YCSB_HBASE_CONF]:
-      remote_path = posixpath.join(conf_dir, os.path.basename(file_name))
-      if file_name.endswith('.j2'):
-        vm.RenderTemplate(file_path, os.path.splitext(remote_path)[0], context)
-      else:
-        vm.RemoteCopy(file_path, remote_path)
-
-  # Patch YCSB to include ALPN on the bootclasspath
-  ycsb_memory = min(vm.total_memory_kb // 1024, 4096)
-  cmd = ("""sed -i.bak -e '/^ycsb_command =/a """
-         """  "-Xmx{0}m", "-Xbootclasspath/p:{1}",' {2}""").format(
-             ycsb_memory, _GetALPNLocalPath(), ycsb.YCSB_EXE)
-  vm.RemoteCommand(cmd)
-  # ... and fail if Java exits non-zero
-  cmd = "sed -i -e 's/^subprocess.call/subprocess.check_call/' {0} ".format(
-      ycsb.YCSB_EXE)
-  vm.RemoteCommand(cmd)
+    remote_path = posixpath.join(hbase.HBASE_CONF_DIR,
+                                 os.path.basename(file_name))
+    if file_name.endswith('.j2'):
+      vm.RenderTemplate(file_path, os.path.splitext(remote_path)[0], context)
+    else:
+      vm.RemoteCopy(file_path, remote_path)
 
 
 def Prepare(benchmark_spec):
@@ -253,7 +246,16 @@ def Run(benchmark_spec):
 
   table_name = _GetTableName()
 
-  executor = ycsb.YCSBExecutor('hbase-10', table=table_name)
+  # Add hbase conf dir to the classpath, ALPN to the bootclasspath.
+  ycsb_memory = ycsb_memory = min(vms[0].total_memory_kb // 1024, 4096)
+  jvm_args = pipes.quote('-Xmx{0}m -Xbootclasspath/p:{1}'.format(
+      ycsb_memory, _GetALPNLocalPath()))
+
+  executor_flags = {'cp': hbase.HBASE_CONF_DIR,
+                    'jvm-args': jvm_args,
+                    'table': table_name}
+
+  executor = ycsb.YCSBExecutor('hbase-10', **executor_flags)
   cluster_info = _GetClusterDescription(FLAGS.project or _GetDefaultProject(),
                                         FLAGS.google_bigtable_zone_name,
                                         FLAGS.google_bigtable_cluster_name)

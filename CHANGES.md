@@ -1,3 +1,126 @@
+# v0.21.0
+
+* New features:
+  * Add support for OpenStack affinity and anti-affinity groups. (GH-440, thanks to @kivio)
+  * Add large object scenario for CLI tests in object_storage_service. (GH-445)
+  * Add support for pre-emptible GCE VMs. (GH-415)
+
+* Enhancements:
+  * Parallelize cassandra_ycsb and hbase_ycsb benchmark setups. (GH-435)
+  * Add more config options for aerospike benchmark. (GH-450)
+
+* Bugfixes and maintenance updates:
+  * Refactor OpenStack network IP management. (GH-438, thanks to @kivio)
+  * Fix thread lock pickling bug. (GH-425, thanks to @kivio)
+  * Update jars used in cloud_bigtable_ycsb benchmark. (GH-444)
+  * Update YCSB to v0.3.0. (GH-428)
+  * Fix object_storage_service bug introduced by Azure breaking change. (GH-446)
+  * Fix object storage CLI output format. (GH-449)
+
+# v0.20.0
+
+* Enhancements:
+  * Specify project to gcloud alpha bigtable clusters list (GH-433)
+  * More Samples in FIO (GH-416)
+
+* Bugfixes and maintenance updates:
+  * pkb label problem in OpenStack driver fixes (GH-410)
+  * On exception, only cleanup if run stage is all/cleanup (GH-412)
+  * Fix issue with using a flag before flags are parsed (GH-413)
+  * Umount disk when running fio against raw device. (GH-417)
+  * Clarify warnings from ycsb._CombineResults. (GH-432)
+
+# v0.19.0
+
+* New features:
+  * New mysql_service benchmark. This benchmarks a cloud's managed MySQL
+    offering using sysbench. (GH-387)
+
+* Enhancements:
+  * Added option to disable iptables if your image requires it (GH-361)
+  * mongodb_ycsb now installs client and server dependencies in parallel,
+    speeding up the end to end run time for the benchmark. (GH-402)
+  * The netperf and iperf benchmarks now only add firewall rules if they are
+    running over external ips. (GH-382)
+
+* Bugfixes and maintenance updates:
+  * The iperf package will now check the 'redhat-release' version and install
+    directly from an RPM (this enables iperf to be run on Scientific Linux 6.x).
+    (GH-392, thanks to @Vukasin92)
+  * Fix bug where VM temporary directory wasn't created before use on RHEL based
+    static VMs. (GH-389, thanks to @Vukasin92)
+  * netperf package url changed since version 2.6.0 is now in archive/ (GH-390)
+  * Fixed DigitalOcean package installation error (GH-396)
+  * The object_storage_service benchmark no longer copies gcloud logs as part of copying
+    the gcloud configuration to the VM. (GH-383)
+  * Correctly cleanup network resources when run stages are used. (GH-386)
+  * Added timeout to apt-get update command because it will occasionally hang.
+    (GH-391)
+  * Update copy_throughput benchmark so it works with
+    ContainerizedVirtualMachines. (GH-408)
+  * Install python inside ContainerizedVirtualMachines so that
+    RobustRemoteCommand works on them. (GH-404)
+
+* Benchmark-specific changes:
+  * speccpu2006 will no longer report results if the run was incomplete. This
+    behavior can be modified with a flag. (GH-397)
+  * The mongodb benchmark has been completely removed since mongodb_ycsb
+    replaced it with greater functionality. (GH-403)
+  * The fio benchmark now has more latency percentiles included in sample
+    metadata. (GH-399)
+  * Cassandra version bumped up to 2.0.16 since 2.0.0 has known issues (GH-393)
+
+
+# v0.18.0
+
+(See also https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/issues/369
+which includes this change log with clickable GH-* links.)
+
+* New features:
+  * Support OpenStack as cloud provider (GH-305, GH-353, thanks @kivio and
+    @mateusz-blaszkowski)
+  * Support Rackspace as cloud provider (GH-336, thanks @meteorfox and @jrperritt)
+  * Add support for ContainerizedVM using docker exec (GH-333, thanks @gablg1)
+  * Windows guest VM support on Static VM (GH-350), Azure (GH-349, GH-374), AWS
+    (GH-347), and GCE (GH-338)
+  * Add NTttcp Windows networking benchmark (GH-348)
+
+* Enhancements:
+  * Support using proxies in VMs (GH-339, GH-337, thanks @kivio)
+  * Enable optional migration on GCE (GH-343)
+  * Execute long running commands via a remote agent (GH-310)
+  * Add resource creation/deletion times to logs (GH-316)
+
+* Bugfixes and maintenance updates:
+  * Update PKB to work with Azure version 0.9.3 (GH-312)
+  * Fix AWS CLI usage on Windows host (GH-313)
+  * Auto-fetch AMI IDs for AWS images (GH-364)
+  * Fix publisher missing info for default image and machine type (GH-357)
+  * Fix 'no attribute pkb_thread_log_context' error for sub-thread logs (GH-322)
+
+* Benchmark-specific changes:
+  * aerospike: config/flag handling bugfixes (GH-367, GH-360, GH-354)
+  * cassandra_ycsb: move num_vms prerequisite check
+  * fio: add latency percentiles for results (GH-344)
+  * hadoop_terasort: Fix bad SSH option (GH-328)
+  * iperf: add lower bounds to arguments (GH-314)
+  * iperf: add timeout to parallel benchmark runs to handle iperf hangs (GH-375)
+  * netperf: Support confidence intervals, increase test length, report stddev
+    (GH-317, GH-306)
+  * ycsb: Drop unaggregatable results from samples (GH-324)
+
+* Development and testing:
+  * **Breaking Change** Automated testing now uses `tox` (GH-330)
+  * Refactored hook scripts, including new opt-in pre-push hook (GH-363)
+  * Use travis for CI testing (GH-340)
+  * Speed up tests using timeouts (GH-299)
+
+* Internals:
+  * Move defaults from benchmark_spec to VM classes, move network instantiation
+    out of benchmark spec (GH-342)
+  * Add event hook support (GH-315)
+  * Refactor VM classes (GH-321)
+
 # v0.17.0
 
 * Add initial support for DigitalOcean as a cloud provider (GH-291).

@@ -62,7 +62,8 @@ def Prepare(benchmark_spec):
   vms = benchmark_spec.vms
   for vm in vms:
     vm.Install('iperf')
-    fw.AllowPort(vm, IPERF_PORT)
+    if vm_util.ShouldRunOnExternalIpAddress():
+      fw.AllowPort(vm, IPERF_PORT)
     vm.RemoteCommand('nohup iperf --server --port %s &> /dev/null &' %
                      IPERF_PORT)
 
@@ -83,7 +84,12 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, ip_type):
                (receiving_ip_address, IPERF_PORT,
                 FLAGS.iperf_runtime_in_seconds,
                 FLAGS.iperf_sending_thread_count))
-  stdout, _ = sending_vm.RemoteCommand(iperf_cmd, should_log=True)
+  # the additional time on top of the iperf runtime is to account for the
+  # time it takes for the iperf process to start and exit
+  timeout_buffer = 30 + FLAGS.iperf_sending_thread_count
+  stdout, _ = sending_vm.RemoteCommand(iperf_cmd, should_log=True,
+                                       timeout=FLAGS.iperf_runtime_in_seconds +
+                                       timeout_buffer)
 
   # Example output from iperf that needs to be parsed
   # STDOUT: ------------------------------------------------------------
