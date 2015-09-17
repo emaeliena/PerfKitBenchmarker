@@ -269,8 +269,6 @@ def RunThreaded(target, thread_params, max_concurrent_threads=200):
     threads.append(thread)
     thread.daemon = True
     thread.start()
-    import time
-    time.sleep(60)
   while threads:
     thread = threads.pop(0)
     try:
