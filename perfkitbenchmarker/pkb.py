@@ -162,6 +162,9 @@ flags.DEFINE_string('https_proxy', '',
 flags.DEFINE_string('ftp_proxy', '',
                     'Specify a proxy for FTP in the form '
                     '[user:passwd@]proxy.server:port.')
+flags.DEFINE_string('http_server', '172.16.0.209',
+                    'grab files from '
+                    'ip or domain')
 
 MAX_RUN_URI_LENGTH = 8
 

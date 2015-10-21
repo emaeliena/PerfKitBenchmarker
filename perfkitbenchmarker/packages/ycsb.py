@@ -55,8 +55,7 @@ from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS
 
-YCSB_TAR_URL = ('https://github.com/brianfrankcooper/YCSB/releases/'
-                'download/0.3.0/ycsb-0.3.0.tar.gz')
+YCSB_TAR_URL = ('ycsb-0.3.0.tar.gz')
 YCSB_DIR = posixpath.join(vm_util.VM_TMP_DIR, 'ycsb')
 YCSB_EXE = posixpath.join(YCSB_DIR, 'bin', 'ycsb')
 
@@ -139,11 +138,11 @@ def CheckPrerequisites():
 
 def _Install(vm):
   """Installs the YCSB package on the VM."""
-  vm.Install('openjdk7')
-  vm.Install('curl')
-  vm.RemoteCommand(('mkdir -p {0} && curl -L {1} | '
+  #vm.Install('openjdk7')
+  #vm.Install('curl')
+  vm.RemoteCommand(('mkdir -p {0} && NO_PROXY={2}  curl   -L http://{2}/{1} | '
                     'tar -C {0} --strip-components=1 -xzf -').format(
-                        YCSB_DIR, YCSB_TAR_URL))
+                        YCSB_DIR, YCSB_TAR_URL, FLAGS.http_server))
 
 
 def YumInstall(vm):

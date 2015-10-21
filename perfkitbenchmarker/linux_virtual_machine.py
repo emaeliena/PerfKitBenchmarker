@@ -640,6 +640,7 @@ class DebianMixin(BaseLinuxMixin):
   @vm_util.Retry(max_retries=UPDATE_RETRIES)
   def AptUpdate(self):
     """Updates the package lists on VMs using apt."""
+    return
     try:
       self.RemoteCommand('sudo apt-get update')
     except errors.VirtualMachine.RemoteCommandError as e:

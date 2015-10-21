@@ -26,13 +26,13 @@ import time
 
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 
+FLAGS = flags.FLAGS
 
-JNA_JAR_URL = ('https://maven.java.net/content/repositories/releases/'
-               'net/java/dev/jna/jna/4.1.0/jna-4.1.0.jar')
-CASSANDRA_TAR_URL = ('http://archive.apache.org/dist/cassandra/2.0.0/'
-                     'apache-cassandra-2.0.0-bin.tar.gz')
+JNA_JAR_URL = ('jna-4.1.0.jar')
+CASSANDRA_TAR_URL = ('apache-cassandra-2.0.0-bin.tar.gz')
 CASSANDRA_YAML_TEMPLATE = 'cassandra/cassandra.yaml.j2'
 CASSANDRA_ENV_TEMPLATE = 'cassandra/cassandra-env.sh.j2'
 CASSANDRA_DIR = posixpath.join(vm_util.VM_TMP_DIR, 'apache-cassandra')
@@ -62,16 +62,16 @@ def CheckPrerequisites():
 
 def _Install(vm):
   """Installs Cassandra from a tarball."""
-  vm.Install('openjdk7')
-  vm.Install('curl')
-  vm.RemoteCommand('mkdir {0} && curl -L {1} | '
+  #vm.Install('openjdk7')
+  #vm.Install('curl')
+  vm.RemoteCommand('mkdir {0} && NO_PROXY={2} curl  -L http://{2}/{1} | '
                    'tar -C {0} -xzf - --strip-components=1'.format(
-                       CASSANDRA_DIR, CASSANDRA_TAR_URL))
+                       CASSANDRA_DIR, CASSANDRA_TAR_URL, FLAGS.http_server))
 
   # Add JNA
-  vm.RemoteCommand('cd {0} && curl -LJO {1}'.format(
+  vm.RemoteCommand('cd {0} &&  NO_PROXY={2} curl -LJO http://{2}/{1}'.format(
       posixpath.join(CASSANDRA_DIR, 'lib'),
-      JNA_JAR_URL))
+      JNA_JAR_URL, FLAGS.http_server))
 
 
 def YumInstall(vm):
