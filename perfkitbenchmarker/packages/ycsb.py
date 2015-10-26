@@ -707,6 +707,7 @@ class YCSBExecutor(object):
     assert workloads, 'no workloads'
     load_samples = list(self._LoadThreaded(vms, workloads[0],
                                            **(load_kwargs or {})))
+    logging.info('Starting to run samples')
     run_samples = list(self.RunStaircaseLoads(vms, workloads,
                                               **(run_kwargs or {})))
     if FLAGS.ycsb_load_samples:
