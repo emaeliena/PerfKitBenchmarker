@@ -165,7 +165,7 @@ flags.DEFINE_string('ftp_proxy', '',
 flags.DEFINE_string('http_server', '172.16.0.209',
                     'grab files from '
                     'ip or domain')
-flags.DEFINE_string('predownload', '/opt/pkbdownloads',
+flags.DEFINE_string('predownload', '',
                     'get files from local drive instead of network')
 
 MAX_RUN_URI_LENGTH = 8
