@@ -140,9 +140,14 @@ def _Install(vm):
   """Installs the YCSB package on the VM."""
   #vm.Install('openjdk7')
   #vm.Install('curl')
-  vm.RemoteCommand(('mkdir -p {0} && NO_PROXY={2}  curl   -L http://{2}/{1} | '
-                    'tar -C {0} --strip-components=1 -xzf -').format(
-                        YCSB_DIR, YCSB_TAR_URL, FLAGS.http_server))
+  if FLAGS.predownload:
+    vm.RemoteCommand(('mkdir -p {0} && cat {1}/{2} | '
+                      'tar -C {0} --strip-components=1 -xzf -').format(
+                      YCSB_DIR, FLAGS.predownload, YCSB_TAR_URL))
+  else:
+    vm.RemoteCommand(('mkdir -p {0} && NO_PROXY={2} curl -L http://{2}/{1} | '
+                      'tar -C {0} --strip-components=1 -xzf -').format(
+                      YCSB_DIR, YCSB_TAR_URL, FLAGS.http_server))
 
 
 def YumInstall(vm):

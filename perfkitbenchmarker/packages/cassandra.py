@@ -64,14 +64,25 @@ def _Install(vm):
   """Installs Cassandra from a tarball."""
   #vm.Install('openjdk7')
   #vm.Install('curl')
-  vm.RemoteCommand('mkdir {0} && NO_PROXY={2} curl  -L http://{2}/{1} | '
-                   'tar -C {0} -xzf - --strip-components=1'.format(
-                       CASSANDRA_DIR, CASSANDRA_TAR_URL, FLAGS.http_server))
 
-  # Add JNA
-  vm.RemoteCommand('cd {0} &&  NO_PROXY={2} curl -LJO http://{2}/{1}'.format(
-      posixpath.join(CASSANDRA_DIR, 'lib'),
-      JNA_JAR_URL, FLAGS.http_server))
+  if FLAGS.predownload:
+    vm.RemoteCommand('mkdir {0} && cat {1}/{2} | '
+                     'tar -C {0} -xzf - --strip-components=1'.format(
+                     CASSANDRA_DIR, FLAGS.predownload, CASSANDRA_TAR_URL))
+
+    vm.RemoteCommand('cp {0}/{1} {2}'.format(
+                     FLAGS.predownload, JNA_JAR_URL,
+                     posixpath.join(CASSANDRA_DIR, 'lib')
+    ))
+  else:
+    vm.RemoteCommand('mkdir {0} && NO_PROXY={2} curl  -L http://{2}/{1} | '
+                     'tar -C {0} -xzf - --strip-components=1'.format(
+                     CASSANDRA_DIR, CASSANDRA_TAR_URL, FLAGS.http_server))
+
+    # Add JNA
+    vm.RemoteCommand('cd {0} &&  NO_PROXY={2} curl -LJO http://{2}/{1}'.format(
+                     posixpath.join(CASSANDRA_DIR, 'lib'),
+                     JNA_JAR_URL, FLAGS.http_server))
 
 
 def YumInstall(vm):
