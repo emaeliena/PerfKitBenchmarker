@@ -216,7 +216,7 @@ class BenchmarkSpec(object):
 
     if self.vms:
       prepare_args = [((vm, self.firewall), {}) for vm in self.vms]
-      vm_util.RunThreaded(self.PrepareVm, prepare_args)
+      vm_util.RunThreaded(self.PrepareVm, prepare_args, sleep_between=30)
       if FLAGS.os_type != WINDOWS:
         vm_util.GenerateSSHConfig(self.vms)
 

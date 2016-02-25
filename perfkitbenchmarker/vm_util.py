@@ -216,7 +216,8 @@ class ThreadWithExceptions(threading.Thread):
       raise errors.VmUtil.ThreadException(self.exception)
 
 
-def RunThreaded(target, thread_params, max_concurrent_threads=200):
+def RunThreaded(target, thread_params, max_concurrent_threads=200,
+                sleep_between=0):
   """Runs the target method in parallel threads.
 
   The method starts up threads with one arg from thread_params as the first arg.
@@ -269,6 +270,9 @@ def RunThreaded(target, thread_params, max_concurrent_threads=200):
     threads.append(thread)
     thread.daemon = True
     thread.start()
+    logging.info('sleeping for {0}s before starting'
+                 'next thread'.format(sleep_between))
+    time.sleep(sleep_between)
   while threads:
     thread = threads.pop(0)
     try:
